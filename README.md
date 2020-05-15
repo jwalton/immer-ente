@@ -163,8 +163,25 @@ function MyComponent() {
 }
 ```
 
-Note that your selector needs to return exactly the same object on each
-invocation in order to avoid a re-render.
+If your selector returns an object, then it must return exactly the same object
+on each invocation in order to avoid a re-render. If you have multiple values
+you want to fetch, you can use an array selector:
+
+```tsx
+function MyComponent() {
+  // Only re-render this component if `state.age` changes.
+  const [[age, name]] = useController((state) => [state.age, state.name]);
+
+  return (
+    <div>
+      My age is {age}, and my name is {name}.
+    </div>
+  );
+}
+```
+
+This will not re-render in the case where the length of the array doesn't change,
+and all elements in the array are identical.
 
 ## Writing unit tests
 

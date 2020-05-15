@@ -59,4 +59,58 @@ describe('immerEnte - rerender test', function () {
         expect(ageRenderCount, 'age render count').to.equal(2);
         expect(nameRenderCount, 'name render count').to.equal(1);
     });
+
+    it("should support array selectors", function () {
+        const initialState = {
+            age: 8,
+            name: 'Oriana',
+            height: 'not tall',
+        };
+
+        const { Provider, useController } = immerEnte(initialState, (updateState) => ({
+            incrementAge: () =>
+                updateState((state) => {
+                    state.age++;
+                }),
+        }));
+
+        let ageRenderCount = 0;
+        const ShowAge = () => {
+            ageRenderCount++;
+            const [age, actions] = useController((state) => state.age);
+            return (
+                <div>
+                    {age}
+                    <button onClick={() => actions.incrementAge()}>Increase</button>
+                </div>
+            );
+        };
+
+        let detailsRenderCount = 0;
+        const ShowDetails = () => {
+            detailsRenderCount++;
+            const [[name, height]] = useController((state) => [state.name, state.height]);
+            return <div>{name} {height}</div>;
+        };
+
+        render(
+            <Provider>
+                <ShowAge />
+                <ShowDetails />
+            </Provider>
+        );
+
+        const button = screen.getByText('Increase');
+        fireEvent(
+            button,
+            new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+            })
+        );
+
+        screen.getByText('9');
+        expect(ageRenderCount, 'age render count').to.equal(2);
+        expect(detailsRenderCount, 'details render count').to.equal(1);
+    });
 });

@@ -5,6 +5,12 @@ import useIsMounted from './useIsMounted';
 
 export { Immutable };
 
+// Don't allow thousands of elements in an array selector.  If this
+// happens, someone is probably trying to just select the array itself,
+// and we don't want to spend forever checking elements in the array for
+// equality to "save time".
+const MAX_ARRAY_SELECTOR_LENGTH = 100;
+
 export type StateMutateFn<T> = (recipe: (draft: T) => void) => void;
 
 /**
@@ -75,7 +81,9 @@ export default function immerEnte<T, A>(
         );
         useSubscription(subscribersRef.current, (newState: Immutable<T>) => {
             const nextState = selectorFn ? selectorFn(newState) : newState;
-            setState((nextState as any) as Immutable<S>);
+            if (selectorResultChanged(state, nextState)) {
+                setState((nextState as any) as Immutable<S>);
+            }
         });
 
         // TODO: Optimize this to not rerender as much.
@@ -111,4 +119,20 @@ export default function immerEnte<T, A>(
         useController,
         makeTestController,
     };
+}
+
+function selectorResultChanged(old: any, newState: any) {
+    if (old === newState) {
+        return false;
+    } else if (
+        Array.isArray(old) &&
+        Array.isArray(newState) &&
+        old.length === newState.length &&
+        old.length < MAX_ARRAY_SELECTOR_LENGTH &&
+        old.every((val, index) => newState[index] === val)
+    ) {
+        return false;
+    } else {
+        return true;
+    }
 }
