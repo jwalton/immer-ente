@@ -1,0 +1,94 @@
+{
+  "name": "immer-ente",
+  "version": "0.0.0-semantic-release",
+  "description": "React state management with immer",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "test": "npm run build && npm run lint && npm run test:unittest",
+    "precommit:test": "npm run build && lint-staged && npm run precommit:unittest",
+    "build": "tsc",
+    "clean": "rm -rf dist types coverage",
+    "test:unittest": "tsc -p test && nyc mocha 'test/**/*.@(ts|tsx|js|jsx)'",
+    "test:coverage": "tsc -p test && nyc mocha 'test/**/*.@(ts|tsx|js|jsx)'",
+    "precommit:unittest": "tsc -p test && mocha --reporter progress 'test/**/*.@(ts|tsx|js|jsx)'",
+    "lint": "npm run lint:source && npm run lint:tests",
+    "lint:source": "eslint --ext .ts --ext .tsx src",
+    "lint:tests": "eslint --ext .ts --ext .tsx test",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build && npm test",
+    "semantic-release": "semantic-release"
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "eslint --ext ts --ext tsx"
+    ],
+    "test/**/*.ts": [
+      "eslint --ext ts --ext tsx"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jwalton/immer-ente.git"
+  },
+  "keywords": [
+    "immer",
+    "redux",
+    "state management",
+    "hooks"
+  ],
+  "author": {
+    "name": "Jason Walton",
+    "email": "dev@lucid.thedreaming.org",
+    "url": "https://thedreaming.org"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/exegesis-js/jwalton/immer-ente/issues"
+  },
+  "homepage": "https://github.com/jwalton/immer-ente#readme",
+  "devDependencies": {
+    "@testing-library/react": "^10.0.4",
+    "@types/chai": "^4.2.11",
+    "@types/chai-dom": "0.0.9",
+    "@types/mocha": "^7.0.2",
+    "@types/node": "^10.0.0",
+    "@types/react": "^16.9.35",
+    "@types/react-dom": "^16.9.8",
+    "@types/sinon": "^9.0.1",
+    "@typescript-eslint/eslint-plugin": "^2.33.0",
+    "@typescript-eslint/parser": "^2.33.0",
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
+    "chai-dom": "^1.8.2",
+    "coveralls": "^3.1.0",
+    "eslint": "^7.0.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-react": "^7.20.0",
+    "husky": "^4.2.5",
+    "jsdom": "^16.2.2",
+    "jsdom-global": "^3.0.2",
+    "mocha": "^7.1.2",
+    "nyc": "^15.0.1",
+    "prettier": "^2.0.5",
+    "pretty-quick": "^2.0.1",
+    "promise-tools": "^2.1.0",
+    "semantic-release": "^17.0.7",
+    "sinon": "^9.0.2",
+    "ts-node": "^8.10.1",
+    "typescript": "^3.9.2"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "pretty-quick --staged && npm run test:pre-commit"
+    }
+  },
+  "dependencies": {
+    "immer": "^6.0.5",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1"
+  }
+}
