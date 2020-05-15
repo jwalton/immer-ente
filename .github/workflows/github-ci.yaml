@@ -13,7 +13,7 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
-      - name: npm install
+      - run: npm install
       - name: test
         run: npm test
 
@@ -26,7 +26,7 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: 14
-      - name: npm install
+      - run: npm install
       - name: semantic-release
         if: success() && github.ref == 'refs/heads/master'
         run: npm run semantic-release
