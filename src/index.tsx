@@ -1,5 +1,6 @@
 import produce, { Immutable } from 'immer';
-import React, { useContext, useState, useRef } from 'react';
+import React, { useContext, useRef, useState } from 'react';
+import { Subscribers, useSubscription } from './stateSubscriptions';
 import useIsMounted from './useIsMounted';
 
 export type StateMutateFn<T> = (recipe: (draft: T) => void) => void;
@@ -20,20 +21,25 @@ export default function immerEnte<T, A>(
     initialState: Immutable<T>,
     generateActions: (updateState: StateMutateFn<T>, getState: () => Immutable<T>) => A
 ) {
-    const context = React.createContext<{ state: Immutable<T>; actions: A }>({
-        state: initialState,
+    const context = React.createContext<{
+        stateRef: React.MutableRefObject<Immutable<T>>;
+        subscribersRef: React.MutableRefObject<Subscribers<Immutable<T>>>;
+        actions: A;
+    }>({
+        stateRef: { current: initialState },
+        subscribersRef: { current: new Subscribers<Immutable<T>>() },
         actions: {} as any,
     });
 
     const Provider: React.FC<{ defaultState?: Immutable<T> }> = (props) => {
         const mounted = useIsMounted();
+        const subscribersRef = useRef(new Subscribers<Immutable<T>>());
         const stateRef = useRef(props.defaultState || initialState);
-        const [state, setState] = useState<Immutable<T>>(stateRef.current);
 
         const updateState: StateMutateFn<T> = (recipe) => {
-            stateRef.current = produce(state, recipe);
+            stateRef.current = produce(stateRef.current, recipe);
             if (mounted.current) {
-                setState(stateRef.current);
+                subscribersRef.current.trigger(stateRef.current);
             }
         };
 
@@ -43,13 +49,43 @@ export default function immerEnte<T, A>(
 
         const actions = generateActions(updateState, getState);
 
-        return <context.Provider value={{ state, actions }}>{props.children}</context.Provider>;
+        return (
+            <context.Provider
+                value={{
+                    stateRef,
+                    subscribersRef,
+                    actions,
+                }}
+            >
+                {props.children}
+            </context.Provider>
+        );
     };
 
-    function useController(): [Immutable<T>, A] {
-        const { state, actions } = useContext(context);
+    function useController(): [Immutable<T>, A];
+    function useController<S>(selectorFn: (state: Immutable<T>) => Immutable<S>): [Immutable<S>, A];
+    function useController<S = T>(
+        selectorFn?: (state: Immutable<T>) => Immutable<S>
+    ): [Immutable<T> | Immutable<S>, A] {
+        const { stateRef, subscribersRef, actions } = useContext(context);
+        const [state, setState] = useState<Immutable<S>>(
+            selectorFn ? selectorFn(stateRef.current) : ((stateRef.current as any) as Immutable<S>)
+        );
+        useSubscription(subscribersRef.current, (newState: Immutable<T>) => {
+            const nextState = selectorFn ? selectorFn(newState) : newState;
+            setState((nextState as any) as Immutable<S>);
+        });
+
+        // TODO: Optimize this to not rerender as much.
         return [state, actions];
     }
+
+    const Consumer: React.FC<{
+        children: (value: { state: Immutable<T>; actions: A }) => JSX.Element;
+    }> = (props) => {
+        const [state, actions] = useController();
+        return props.children({ state, actions });
+    };
 
     function makeTestController(defaultState?: Immutable<T>) {
         let state: Immutable<T> = defaultState || initialState;
@@ -68,7 +104,7 @@ export default function immerEnte<T, A>(
     }
 
     return {
-        Consumer: context.Consumer,
+        Consumer,
         Provider,
         useController,
         makeTestController,
