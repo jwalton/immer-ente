@@ -3,6 +3,8 @@ import React, { useContext, useRef, useState } from 'react';
 import { Subscribers, useSubscription } from './stateSubscriptions';
 import useIsMounted from './useIsMounted';
 
+export { Immutable };
+
 export type StateMutateFn<T> = (recipe: (draft: T) => void) => void;
 
 /**
