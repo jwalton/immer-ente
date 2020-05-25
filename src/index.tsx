@@ -1,9 +1,9 @@
-import produce, { Immutable } from 'immer';
-import React, { useContext, useRef, useState } from 'react';
+import produce, { castDraft, castImmutable, Immutable } from 'immer';
+import React, { useContext, useRef, useState, useMemo } from 'react';
 import { Subscribers, useSubscription } from './stateSubscriptions';
 import useIsMounted from './useIsMounted';
 
-export { Immutable };
+export { Immutable, castDraft, castImmutable };
 
 // Don't allow thousands of elements in an array selector.  If this
 // happens, someone is probably trying to just select the array itself,
@@ -12,6 +12,16 @@ export { Immutable };
 const MAX_ARRAY_SELECTOR_LENGTH = 100;
 
 export type StateMutateFn<T> = (recipe: (draft: T) => void) => void;
+
+export interface ImmerEnteResult<T, A> {
+    Consumer: React.FC<{
+        children: (value: { state: Immutable<T>; actions: A }) => JSX.Element;
+    }>;
+    Provider: React.FC<{ defaultState?: Immutable<T> }>;
+    useController(): [Immutable<T>, A];
+    useController<S>(selectorFn: (state: Immutable<T>) => Immutable<S>): [Immutable<S>, A];
+    makeTestController(defaultState?: Immutable<T>): { getState: () => Immutable<T>; actions: A };
+}
 
 /**
  * This is a lightweight alternative to Redux, built using immer, heavily
@@ -28,7 +38,7 @@ export type StateMutateFn<T> = (recipe: (draft: T) => void) => void;
 export default function immerEnte<T, A>(
     initialState: Immutable<T>,
     generateActions: (updateState: StateMutateFn<T>, getState: () => Immutable<T>) => A
-) {
+): ImmerEnteResult<T, A> {
     const context = React.createContext<{
         stateRef: React.MutableRefObject<Immutable<T>>;
         subscribersRef: React.MutableRefObject<Subscribers<Immutable<T>>>;
@@ -44,18 +54,21 @@ export default function immerEnte<T, A>(
         const subscribersRef = useRef(new Subscribers<Immutable<T>>());
         const stateRef = useRef(props.defaultState || initialState);
 
-        const updateState: StateMutateFn<T> = (recipe) => {
-            stateRef.current = produce(stateRef.current, recipe);
-            if (mounted.current) {
-                subscribersRef.current.trigger(stateRef.current);
+        const actions = useMemo(() => {
+            const updateState: StateMutateFn<T> = (recipe) => {
+                stateRef.current = produce(stateRef.current, recipe);
+                if (mounted.current) {
+                    subscribersRef.current.trigger(stateRef.current);
+                }
+            };
+
+            function getState(): Immutable<T> {
+                return stateRef.current;
             }
-        };
 
-        function getState(): Immutable<T> {
-            return stateRef.current;
-        }
-
-        const actions = generateActions(updateState, getState);
+            const actions = generateActions(updateState, getState);
+            return actions;
+        }, [generateActions]);
 
         return (
             <context.Provider
