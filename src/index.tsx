@@ -43,10 +43,12 @@ export default function immerEnte<T, A>(
         stateRef: React.MutableRefObject<Immutable<T>>;
         subscribersRef: React.MutableRefObject<Subscribers<Immutable<T>>>;
         actions: A;
+        isDefault: boolean;
     }>({
         stateRef: { current: initialState },
         subscribersRef: { current: new Subscribers<Immutable<T>>() },
         actions: {} as any,
+        isDefault: true,
     });
 
     const Provider: React.FC<{ defaultState?: Immutable<T> }> = (props) => {
@@ -76,6 +78,7 @@ export default function immerEnte<T, A>(
                     stateRef,
                     subscribersRef,
                     actions,
+                    isDefault: false,
                 }}
             >
                 {props.children}
@@ -88,7 +91,12 @@ export default function immerEnte<T, A>(
     function useController<S = T>(
         selectorFn?: (state: Immutable<T>) => Immutable<S>
     ): [Immutable<T> | Immutable<S>, A] {
-        const { stateRef, subscribersRef, actions } = useContext(context);
+        const { stateRef, subscribersRef, actions, isDefault } = useContext(context);
+
+        if(isDefault) {
+            throw new Error(`Missing immer-ente provider.`);
+        }
+
         const [state, setState] = useState<Immutable<S>>(
             selectorFn ? selectorFn(stateRef.current) : ((stateRef.current as any) as Immutable<S>)
         );

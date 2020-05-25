@@ -216,6 +216,21 @@ describe('immerEnte', function () {
         expect(updatedAge).to.equal(97);
     });
 
+    it('should error if provider is not in tree', function () {
+        const { useController } = immerEnte({ age: 9 }, (updateState) => ({
+            setAge() {
+                updateState(() => ({ age: 97 }));
+            },
+        }));
+
+        const ShowAge = () => {
+            const [state, actions] = useController();
+            return <button onClick={actions.setAge}>{state.age}</button>;
+        };
+
+        expect(() => render(<ShowAge />)).to.throw('Missing immer-ente provider.');
+    });
+
     it('should allow testing the actions, like a reducer', function () {
         const { makeTestController } = immerEnte({ age: 9 }, (updateState) => ({
             setAge() {
