@@ -29,5 +29,5 @@ export function useSubscription<T>(subscribers: Subscribers<T>, subscriber: Subs
     useEffect(() => {
         subscribers.subscribe(subscriber);
         return () => subscribers.unsubscribe(subscriber);
-    }, []);
+    }, [subscribers, subscriber]);
 }

@@ -228,7 +228,33 @@ describe('immerEnte', function () {
             return <button onClick={actions.setAge}>{state.age}</button>;
         };
 
-        expect(() => render(<ShowAge />)).to.throw('Missing immer-ente provider.');
+        class ErrorBoundary extends React.Component<{}, { err?: Error }> {
+            constructor(props: any) {
+                super(props);
+                this.state = { err: undefined };
+            }
+
+            static getDerivedStateFromError(error: Error) {
+                return { err: error };
+            }
+
+            render() {
+                if (this.state.err) {
+                    return <h1>{this.state.err.toString()}</h1>;
+                }
+                return this.props.children;
+            }
+        }
+
+        try {
+            render(
+                <ErrorBoundary>
+                    <ShowAge />
+                </ErrorBoundary>
+            );
+        } finally {
+            screen.getByText('Error: Missing immer-ente provider.');
+        }
     });
 
     it('should allow testing the actions, like a reducer', function () {

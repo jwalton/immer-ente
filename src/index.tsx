@@ -1,5 +1,5 @@
 import produce, { castDraft, castImmutable, Immutable } from 'immer';
-import React, { useContext, useRef, useState, useMemo } from 'react';
+import React, { useContext, useRef, useState, useMemo, useCallback } from 'react';
 import { Subscribers, useSubscription } from './stateSubscriptions';
 import useIsMounted from './useIsMounted';
 
@@ -92,6 +92,7 @@ export default function immerEnte<T, A>(
         selectorFn?: (state: Immutable<T>) => Immutable<S>
     ): [Immutable<T> | Immutable<S>, A] {
         const { stateRef, subscribersRef, actions, isDefault } = useContext(context);
+        const mounted = useIsMounted();
 
         if(isDefault) {
             throw new Error(`Missing immer-ente provider.`);
@@ -100,12 +101,23 @@ export default function immerEnte<T, A>(
         const [state, setState] = useState<Immutable<S>>(
             selectorFn ? selectorFn(stateRef.current) : ((stateRef.current as any) as Immutable<S>)
         );
-        useSubscription(subscribersRef.current, (newState: Immutable<T>) => {
-            const nextState = selectorFn ? selectorFn(newState) : newState;
-            if (selectorResultChanged(state, nextState)) {
-                setState((nextState as any) as Immutable<S>);
+
+        // TODO: If the subscriber changes because the selectorFn changes, we
+        // should call the subscriber immediately, not on the next state update.
+        const subscriber = useCallback((newState: Immutable<T>) => {
+            // Verify the current component is mounted.  Sometimes we see cases
+            // where the current component unmounts, and we trigger an update,
+            // and then unsubscribe in that order, which ends up trying to
+            // update the unmounted component.
+            if(mounted.current) {
+                const nextState = selectorFn ? selectorFn(newState) : newState;
+                if (selectorResultChanged(state, nextState)) {
+                    setState((nextState as any) as Immutable<S>);
+                }
             }
-        });
+        }, [setState, selectorFn]);
+
+        useSubscription(subscribersRef.current, subscriber);
 
         // TODO: Optimize this to not rerender as much.
         return [state, actions];
