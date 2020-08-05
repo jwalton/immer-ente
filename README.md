@@ -72,16 +72,22 @@ const { Provider: MyStateProvider, useController: useMyController } = immerEnte(
   })
 );
 
-export function MyComponent() {
+function MyComponent() {
   // `useController` returned by immerEnte gives you access to state and actions
   // in any component mounted under the `Provider` component.
   const [state, actions] = useMyController();
 
   return (
-    <MyStateProvider defaultState={initialState}>
       <button onClick={actions.incrementAge}>{state.age}</button>
-    </MyStateProvider>
   );
+}
+
+export function Screen() {
+    return (
+        <MyStateProvider defaultState={initialState}>
+            <MyComponent />
+        </MyStateProvider>
+    );
 }
 ```
 
