@@ -36,12 +36,15 @@ const initialState = {
 
 // Create our controller with immerEnte
 const { Provider: MyStateProvider, useController: useMyController } = immerEnte(
+
   // Our initial state.
   initialState,
+
   // A function which returns an "actions" object.  Actions have access to the
   // current state via `getState()` and can update state with
   // `updateState(draft => ...)`.  See below for more details.
   (updateState, getState) => ({
+
     // A simple action.
     incrementAge() {
       updateState((state) => {
@@ -57,18 +60,6 @@ const { Provider: MyStateProvider, useController: useMyController } = immerEnte(
       });
     },
 
-    // Actions can be async.
-    async loadAge() {
-      updateState((state) => {
-        state.loading = true;
-      });
-      const response = await fetch('/age');
-      const body = await response.json();
-      updateState((state) => {
-        state.loading = false;
-        state.age = body.age;
-      });
-    },
   })
 );
 
