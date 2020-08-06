@@ -74,6 +74,8 @@ function MyComponent() {
 }
 
 export function Screen() {
+    // Somewhere higher up the render tree we need a `MyStateProvider`
+    // for `useMyController()` to work.
     return (
         <MyStateProvider defaultState={initialState}>
             <MyComponent />
