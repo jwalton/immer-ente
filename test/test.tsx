@@ -228,8 +228,8 @@ describe('immerEnte', function () {
             return <button onClick={actions.setAge}>{state.age}</button>;
         };
 
-        class ErrorBoundary extends React.Component<{}, { err?: Error }> {
-            constructor(props: any) {
+        class ErrorBoundary extends React.Component<unknown, { err?: Error }> {
+            constructor(props: unknown) {
                 super(props);
                 this.state = { err: undefined };
             }
