@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { MutableRefObject, useEffect, useRef } from 'react';
 
-export default function useIsMounted() {
+export default function useIsMounted(): MutableRefObject<boolean> {
     const mounted = useRef(false);
 
     useEffect(() => {
