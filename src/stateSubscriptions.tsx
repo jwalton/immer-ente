@@ -22,6 +22,10 @@ export class Subscribers<T> {
             subscriber(newState);
         }
     }
+
+    public close(): void {
+        this.subscribers = [];
+    }
 }
 
 // A hook to create a subscription on a subscriber.

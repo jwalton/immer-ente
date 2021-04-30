@@ -23,9 +23,7 @@ The biggest advantages over immer-wieder:
 
 ## How to use it
 
-The basic idea is, you create a state object, and a set of actions. The
-`immerEnte()` function returns a `{ Provider, Consumer, useController }` object
-you can use in your application:
+The basic idea is, you create a state object, and a set of actions. The `immerEnte()` function returns a `{ Provider, Consumer, useController, useNewController }` object you can use in your application:
 
 ```tsx
 import immerEnte from 'immer-ente';
@@ -35,8 +33,16 @@ const initialState = {
 };
 
 // Create our controller with immerEnte
-const { Provider: MyStateProvider, useController: useMyController } = immerEnte(
-
+const {
+  // `Provider` will make the controller available to the whole render tree.
+  Provider: MyStateProvider,
+  // `useController` will get the controller from the Provider, or will
+  // throw an error if no Provider exists.
+  useController: useMyController,
+  // `useNewController` will create a new controller and use it, instead of
+  // finding one from the controller.
+  useNewController: useNewMyController,
+} = immerEnte(
   // Our initial state.
   initialState,
 
@@ -44,7 +50,6 @@ const { Provider: MyStateProvider, useController: useMyController } = immerEnte(
   // current state via `getState()` and can update state with
   // `updateState(draft => ...)`.  See below for more details.
   (updateState, getState) => ({
-
     // A simple action.
     incrementAge() {
       updateState((state) => {
@@ -59,28 +64,44 @@ const { Provider: MyStateProvider, useController: useMyController } = immerEnte(
         return { age, loading: false };
       });
     },
-
   })
 );
+
+// Now we have two options for how we can use the contoller - via a Provider
+export function Screen() {
+  // Somewhere higher up the render tree we need a `MyStateProvider`
+  // for `useMyController()` to work.
+  return (
+    <MyStateProvider defaultState={initialState}>
+      <MyComponent />
+    </MyStateProvider>
+  );
+}
 
 function MyComponent() {
   // `useController` returned by immerEnte gives you access to state and actions
   // in any component mounted under the `Provider` component.
   const [state, actions] = useMyController();
 
-  return (
-      <button onClick={actions.incrementAge}>{state.age}</button>
-  );
+  return <button onClick={actions.incrementAge}>{state.age}</button>;
 }
 
-export function Screen() {
-    // Somewhere higher up the render tree we need a `MyStateProvider`
-    // for `useMyController()` to work.
-    return (
-        <MyStateProvider defaultState={initialState}>
-            <MyComponent />
-        </MyStateProvider>
-    );
+// Or we can create a controller via `useNewController()`
+export function Screen2() {
+  const { state, actions } = useNewController();
+
+  return <button onClick={actions.incrementAge}>{state.age}</button>;
+}
+
+// Or we can do a combination of the two:
+export function Screen3() {
+  const controller = useNewController();
+
+  return (
+    <MyStateProvider controller={controller}>
+      <MyComponent />
+    </MyStateProvider>
+  );
 }
 ```
 
@@ -139,14 +160,17 @@ const makeActions = (updateState) => ({
 });
 ```
 
-`immerEnte()` returns a `{ Consumer, Provider, useController }`
+`immerEnte()` returns a `{ Consumer, Provider, useController, makeController }`
 object. If `Provider` is mounted somewhere in your react tree, then `Consumer`
 and the `useController()` hook can be used to get access to get access to state
 and actions from anywhere in that tree. `Provider` can be passed a `defaultState`
 prop, which will let you pass in rehydrated state when doing server side rendering.
 
-`immerEnte()` also returns a `makeTestController()`, which can be used to test
-actions in isolation, without React being involved. See below for more details.
+If you need access to the controller in the same top level component
+
+`immerEnte()` also returns a `makeController()`, which can be used with class
+based components, or can be used to test actions in isolation, without React
+being involved. See below for more details.
 
 ## Preventing unnecessary re-renders
 
@@ -187,7 +211,7 @@ and all elements in the array are identical.
 When writing tests, ideally we'd like to set the initial state to different values,
 and then call actions to update the state, and make sure the state gets updated
 the way we'd like. In a perfect world, we could do all of this without bothering
-with react. `immerEnte()` returns a `makeTestController()` function which makes
+with react. `immerEnte()` returns a `makeController()` function which makes
 this easy to do:
 
 ```ts
@@ -198,7 +222,7 @@ const initialState = {
   age: 10,
 };
 
-const { Provider, Consumer, useController, makeTestController } = immerEnte(
+const { Provider, Consumer, useController, makeController } = immerEnte(
   initialState,
   (updateState, getState) => ({
     incrementAge() {
@@ -211,7 +235,7 @@ export {
   Provider as AgeProvider,
   Consumer as AgeConsumer,
   useController as useAgeController,
-  makeTestController,
+  makeController,
 };
 ```
 
@@ -220,12 +244,12 @@ new initial state for every test:
 
 ```ts
 // createControllerTest.ts
-import { makeTestController } from './createController';
+import { makeController } from './createController';
 import { expect } from 'chai';
 
 describe('age controller tests', function () {
   it('should increment the age', function () {
-    const { actions, getState } = makeTestController({ age: 1 });
+    const { actions, getState } = makeController({ age: 1 });
     actions.incrementAge();
     expect(getState().age).to.equal(2);
   });

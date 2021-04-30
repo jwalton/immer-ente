@@ -223,7 +223,7 @@ describe('immerEnte', function () {
             },
         }));
 
-        const ShowAge = () => {
+        const WillError = () => {
             const [state, actions] = useController();
             return <button onClick={actions.setAge}>{state.age}</button>;
         };
@@ -249,7 +249,7 @@ describe('immerEnte', function () {
         try {
             render(
                 <ErrorBoundary>
-                    <ShowAge />
+                    <WillError />
                 </ErrorBoundary>
             );
         } finally {
@@ -258,13 +258,13 @@ describe('immerEnte', function () {
     });
 
     it('should allow testing the actions, like a reducer', function () {
-        const { makeTestController } = immerEnte({ age: 9 }, (updateState) => ({
+        const { makeController } = immerEnte({ age: 9 }, (updateState) => ({
             setAge() {
                 updateState(() => ({ age: 97 }));
             },
         }));
 
-        const { actions, getState } = makeTestController();
+        const { actions, getState } = makeController();
 
         const state1 = getState();
         expect(state1.age).to.equal(9);
@@ -273,5 +273,8 @@ describe('immerEnte', function () {
 
         const state2 = getState();
         expect(state2.age).to.equal(97);
+
+        // state1 and state2 should be different objects.
+        expect(state1).to.not.equal(state2);
     });
 });
