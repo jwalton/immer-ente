@@ -142,12 +142,20 @@ export default function immerEnte<T, A>(
         return [state, controller.actions];
     }
 
-    function useNewController(defaultState?: Immutable<T>): Controller<T, A> {
+    function useNewController(
+        defaultState?: Immutable<T> | (() => Immutable<T>)
+    ): Controller<T, A> {
         const controllerRef = useRef<Controller<T, A> | undefined>(undefined);
 
         if (controllerRef.current === undefined) {
-            console.log('Creating new controller');
-            controllerRef.current = makeController(defaultState || initialState);
+            let state: Immutable<T>;
+            if (typeof defaultState === 'function') {
+                const stateFn = defaultState as () => Immutable<T>;
+                state = stateFn();
+            } else {
+                state = defaultState || initialState;
+            }
+            controllerRef.current = makeController(state);
         }
 
         // Make sure we re-render when the state of the controller changes.
