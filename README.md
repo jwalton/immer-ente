@@ -26,7 +26,7 @@ The biggest advantages over immer-wieder:
 The basic idea is, you create a state object, and a set of actions. The `immerEnte()` function returns a `{ Provider, Consumer, useController, useNewController }` object you can use in your application:
 
 ```tsx
-import immerEnte from 'immer-ente';
+import immerEnte, { ControllerType } from 'immer-ente';
 
 const initialState = {
   age: 10,
@@ -66,6 +66,11 @@ const {
     },
   })
 );
+
+// ControllerType<> is a Typescript helper to retrieve the type signature for
+// a controller.
+type MyControllerType = ControllerType<typeof Provider>;
+type MyActionsType = MyControllerType['actions'];
 
 // Now we have two options for how we can use the contoller - via a Provider
 export function Screen() {

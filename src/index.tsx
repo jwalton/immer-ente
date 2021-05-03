@@ -194,3 +194,20 @@ function selectorResultChanged<S>(
         return true;
     }
 }
+
+/**
+ * Utility type for extracting the Typescript type of a controller/actions/state.
+ */
+export type ControllerType<C> = C extends React.FC<ProviderProps<infer T, infer A>> // Provider
+    ? Controller<T, A>
+    : C extends (defaultState?: Immutable<infer T>) => Controller<infer T, infer A> // useNewController and makeController.
+    ? Controller<T, A>
+    : C extends UseControllerFn<infer T, infer A> // useController
+    ? Controller<T, A>
+    : C extends React.FC<{
+          children: (value: { state: Immutable<infer T>; actions: infer A }) => JSX.Element;
+      }> // Consumer
+    ? Controller<T, A>
+    : C extends ImmerEnteResult<infer T, infer A> // Whole ImmerEnteResult
+    ? Controller<T, A>
+    : never;
