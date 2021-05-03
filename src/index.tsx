@@ -3,15 +3,18 @@ import React, { useCallback, useContext, useEffect, useRef, useState } from 'rea
 import { Subscribers, useSubscription } from './stateSubscriptions';
 import useIsMounted from './useIsMounted';
 
+export { isShallowEqual } from './isShallowEqual';
 export { Immutable, castDraft, castImmutable, Subscribers };
 
-// Don't allow thousands of elements in an array selector.  If this
-// happens, someone is probably trying to just select the array itself,
-// and we don't want to spend forever checking elements in the array for
-// equality to "save time".
-const MAX_ARRAY_SELECTOR_LENGTH = 100;
-
 export type StateMutateFn<T> = (recipe: (draft: T) => void) => void;
+
+export interface UseControllerFn<T, A> {
+    (): [Immutable<T>, A];
+    <S>(
+        selectorFn: (state: Immutable<T>) => Immutable<S>,
+        isEqual?: (a: Immutable<S>, b: Immutable<S>) => boolean
+    ): [Immutable<S>, A];
+}
 
 export interface Controller<T, A> {
     state: Immutable<T>;
@@ -29,11 +32,8 @@ export interface ImmerEnteResult<T, A> {
         children: (value: { state: Immutable<T>; actions: A }) => JSX.Element;
     }>;
     Provider: React.FC<ProviderProps<T, A>>;
-    useController(): [Immutable<T>, A];
-    useController<S>(selectorFn: (state: Immutable<T>) => Immutable<S>): [Immutable<S>, A];
+    useController: UseControllerFn<T, A>;
     useNewController(defaultState?: Immutable<T>): Controller<T, A>;
-    /** @deprecated */
-    makeTestController(defaultState?: Immutable<T>): Controller<T, A>;
     makeController(defaultState?: Immutable<T>): Controller<T, A>;
 }
 
@@ -103,10 +103,9 @@ export default function immerEnte<T, A>(
         return <context.Provider value={{ controller }}>{props.children}</context.Provider>;
     };
 
-    function useController(): [Immutable<T>, A];
-    function useController<S>(selectorFn: (state: Immutable<T>) => Immutable<S>): [Immutable<S>, A];
     function useController<S = T>(
-        selectorFn?: (state: Immutable<T>) => Immutable<S>
+        selectorFn?: (state: Immutable<T>) => Immutable<S>,
+        isEqual?: (a: Immutable<S>, b: Immutable<S>) => boolean
     ): [Immutable<T> | Immutable<S>, A] {
         const { controller } = useContext(context);
         const mounted = useIsMounted();
@@ -129,7 +128,7 @@ export default function immerEnte<T, A>(
                 // update the unmounted component.
                 if (mounted.current) {
                     const nextState = selectorFn ? selectorFn(newState) : newState;
-                    if (selectorResultChanged(state, nextState)) {
+                    if (selectorResultChanged(state, nextState as Immutable<S>, isEqual)) {
                         setState((nextState as any) as Immutable<S>);
                     }
                 }
@@ -170,22 +169,19 @@ export default function immerEnte<T, A>(
         Provider,
         useController,
         useNewController,
-        makeTestController: makeController,
         makeController,
     };
 }
 
-function selectorResultChanged(old: any, newState: any) {
+function selectorResultChanged<S>(
+    old: Immutable<S>,
+    newState: Immutable<S>,
+    isEqual?: (a: Immutable<S>, b: Immutable<S>) => boolean
+) {
     if (old === newState) {
         return false;
-    } else if (
-        Array.isArray(old) &&
-        Array.isArray(newState) &&
-        old.length === newState.length &&
-        old.length < MAX_ARRAY_SELECTOR_LENGTH &&
-        old.every((val, index) => newState[index] === val)
-    ) {
-        return false;
+    } else if (isEqual) {
+        return !isEqual(old, newState);
     } else {
         return true;
     }

@@ -188,12 +188,18 @@ function MyComponent() {
 
 If your selector returns an object, then it must return exactly the same object
 on each invocation in order to avoid a re-render. If you have multiple values
-you want to fetch, you can use an array selector:
+you want to fetch, you can use an equality check when
+calling `useController(selector, isEqual)`:
 
 ```tsx
+import immerEnte, { isShallowEqual } from 'immer-ente';
+
 function MyComponent() {
   // Only re-render this component if `state.age` changes.
-  const [[age, name]] = useController((state) => [state.age, state.name]);
+  const [{age, name}] = useController(
+    (state) => { age: state.age, name: state.name },
+    isShallowEqual,
+  );
 
   return (
     <div>
@@ -203,8 +209,8 @@ function MyComponent() {
 }
 ```
 
-This will not re-render in the case where the length of the array doesn't change,
-and all elements in the array are identical.
+This will not re-render in the case where `isEqual` returns
+true (in this case when the two objects are shallow-equal).
 
 ## Writing unit tests
 

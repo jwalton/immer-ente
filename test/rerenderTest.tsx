@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import chai, { expect } from 'chai';
 import chaiDom from 'chai-dom';
 import React from 'react';
-import immerEnte from '../src/index';
+import immerEnte, { isShallowEqual } from '../src/index';
 
 chai.use(chaiDom);
 
@@ -159,7 +159,7 @@ describe('immerEnte - rerender test', function () {
         expect(nameRenderCount, 'name render count').to.equal(1);
     });
 
-    it('should support array selectors', function () {
+    it('should support equality check', function () {
         const initialState = {
             age: 8,
             name: 'Oriana',
@@ -188,7 +188,10 @@ describe('immerEnte - rerender test', function () {
         let detailsRenderCount = 0;
         const ShowDetails = () => {
             detailsRenderCount++;
-            const [[name, height]] = useController((state) => [state.name, state.height]);
+            const [[name, height]] = useController(
+                (state) => [state.name, state.height],
+                isShallowEqual
+            );
             return (
                 <div>
                     {name} {height}
