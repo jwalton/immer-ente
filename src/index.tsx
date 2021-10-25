@@ -1,40 +1,44 @@
-import produce, { castDraft, castImmutable, Immutable } from 'immer';
+import { castDraft, castImmutable, Immutable } from 'immer';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Controller, InitialState, makeControllerInstance } from './controller';
 import { Subscribers, useSubscription } from './stateSubscriptions';
 import useIsMounted from './useIsMounted';
 
 export { isShallowEqual } from './isShallowEqual';
-export { Immutable, castDraft, castImmutable, Subscribers };
+export { Immutable, castDraft, castImmutable, Subscribers, Controller };
 
 export type StateMutateFn<T> = (recipe: (draft: T) => void) => void;
 
-export interface UseControllerFn<T, A> {
-    (): [Immutable<T>, A];
+type WithContext<C> = C extends void ? unknown : { context: C };
+
+type NewControllerParams<T, C> = C extends void
+    ? { defaultState?: InitialState<T>; context?: void | (() => void) } | undefined
+    : { defaultState?: InitialState<T>; context: C | (() => C) };
+
+type NewControllerFunction<T, A, C> = C extends void
+    ? (params?: NewControllerParams<T, C>) => Controller<T, A, C>
+    : (params: NewControllerParams<T, C>) => Controller<T, A, C>;
+
+export interface UseControllerFn<T, A, C = void> {
+    (): [Immutable<T>, A, C];
     <S>(
         selectorFn: (state: Immutable<T>) => Immutable<S>,
         isEqual?: (a: Immutable<S>, b: Immutable<S>) => boolean
-    ): [Immutable<S>, A];
+    ): [Immutable<S>, A, C];
 }
 
-export interface Controller<T, A> {
-    state: Immutable<T>;
-    getState: () => Immutable<T>;
-    actions: A;
-    subscribers: Subscribers<Immutable<T>>;
-}
+export type ProviderProps<T, A, C = void> =
+    | ({ defaultState?: Immutable<T> } & WithContext<C>)
+    | { controller: Controller<T, A, C> };
 
-export type ProviderProps<T, A> =
-    | { defaultState?: Immutable<T> }
-    | { controller: Controller<T, A> };
-
-export interface ImmerEnteResult<T, A> {
+export interface ImmerEnteResult<T, A, C = void> {
     Consumer: React.FC<{
-        children: (value: { state: Immutable<T>; actions: A }) => JSX.Element;
+        children: (value: { state: Immutable<T>; actions: A; context: C }) => JSX.Element;
     }>;
-    Provider: React.FC<ProviderProps<T, A>>;
-    useController: UseControllerFn<T, A>;
-    useNewController(defaultState?: Immutable<T>): Controller<T, A>;
-    makeController(defaultState?: Immutable<T>): Controller<T, A>;
+    Provider: React.FC<ProviderProps<T, A, C>>;
+    useController: UseControllerFn<T, A, C>;
+    useNewController: NewControllerFunction<T, A, C>;
+    makeController: NewControllerFunction<T, A, C>;
 }
 
 /**
@@ -49,49 +53,43 @@ export interface ImmerEnteResult<T, A> {
  *   draft and return void, or return a new object used to replace the current
  *   state.
  */
-export default function immerEnte<T, A>(
+export default function immerEnte<T, A, C = void>(
     initialState: Immutable<T>,
-    generateActions: (updateState: StateMutateFn<T>, getState: () => Immutable<T>) => A
-): ImmerEnteResult<T, A> {
-    const context = React.createContext<{ controller?: Controller<T, A> }>({});
+    generateActions: (
+        updateState: StateMutateFn<T>,
+        getState: () => Immutable<T>,
+        getContext: () => C
+    ) => A
+): ImmerEnteResult<T, A, C> {
+    const context = React.createContext<{ controller?: Controller<T, A, C> }>({});
 
-    function makeController(defaultState?: Immutable<T>): Controller<T, A> {
-        let state: Immutable<T> = defaultState || initialState;
+    const makeController = (params: NewControllerParams<T, C>): Controller<T, A, C> => {
+        return makeControllerInstance({
+            initialState: params?.defaultState ?? initialState,
+            context: params?.context,
+            actions: generateActions,
+        } as any);
+    };
 
-        const subscribers = new Subscribers<Immutable<T>>();
+    const Provider: React.FC<ProviderProps<T, A, C>> = (props) => {
+        const controllerRef = useRef<Controller<T, A, C> | undefined>(undefined);
 
-        const updateState: StateMutateFn<T> = (recipe) => {
-            state = produce(state, recipe);
-            subscribers.trigger(state);
-        };
-
-        function getState(): Immutable<T> {
-            return state;
-        }
-
-        const actions = generateActions(updateState, getState);
-
-        return {
-            get state() {
-                return state;
-            },
-            getState,
-            actions,
-            subscribers,
-        };
-    }
-
-    const Provider: React.FC<ProviderProps<T, A>> = (props) => {
-        const controllerRef = useRef<Controller<T, A> | undefined>(undefined);
-
-        let controller: Controller<T, A>;
+        let controller: Controller<T, A, C>;
         if ('controller' in props) {
             controller = props.controller;
         } else {
+            const controllerContext =
+                'context' in props ? ((props as any).context as C) : ((undefined as any) as C);
+
             if (controllerRef.current === undefined) {
-                controllerRef.current = makeController(props.defaultState);
+                const params: { defaultState: Immutable<T> | undefined; context?: C } = {
+                    defaultState: props.defaultState,
+                    context: controllerContext,
+                };
+                controllerRef.current = makeController(params as NewControllerParams<T, C>);
             }
             controller = controllerRef.current;
+            controller.context = controllerContext;
         }
 
         // When we unmount, or if the controller ever changes, unsubscribe
@@ -106,7 +104,7 @@ export default function immerEnte<T, A>(
     function useController<S = T>(
         selectorFn?: (state: Immutable<T>) => Immutable<S>,
         isEqual?: (a: Immutable<S>, b: Immutable<S>) => boolean
-    ): [Immutable<T> | Immutable<S>, A] {
+    ): [Immutable<T> | Immutable<S>, A, C] {
         const { controller } = useContext(context);
         const mounted = useIsMounted();
 
@@ -139,24 +137,18 @@ export default function immerEnte<T, A>(
         useSubscription(controller.subscribers, subscriber);
 
         // TODO: Optimize this to not rerender as much.
-        return [state, controller.actions];
+        return [state, controller.actions, controller.context];
     }
 
-    function useNewController(
-        defaultState?: Immutable<T> | (() => Immutable<T>)
-    ): Controller<T, A> {
-        const controllerRef = useRef<Controller<T, A> | undefined>(undefined);
+    function useNewController(params: NewControllerParams<T, C>): Controller<T, A, C> {
+        const controllerRef = useRef<Controller<T, A, C> | undefined>(undefined);
 
         if (controllerRef.current === undefined) {
-            let state: Immutable<T>;
-            if (typeof defaultState === 'function') {
-                const stateFn = defaultState as () => Immutable<T>;
-                state = stateFn();
-            } else {
-                state = defaultState || initialState;
-            }
-            controllerRef.current = makeController(state);
+            controllerRef.current = makeController(params);
         }
+
+        controllerRef.current.context =
+            params && 'context' in params ? params.context : (undefined as any);
 
         // Make sure we re-render when the state of the controller changes.
         const [, setState] = useState<Immutable<T>>(controllerRef.current.state);
@@ -166,18 +158,18 @@ export default function immerEnte<T, A>(
     }
 
     const Consumer: React.FC<{
-        children: (value: { state: Immutable<T>; actions: A }) => JSX.Element;
+        children: (value: { state: Immutable<T>; actions: A; context: C }) => JSX.Element;
     }> = (props) => {
-        const [state, actions] = useController();
-        return props.children({ state, actions });
+        const [state, actions, context] = useController();
+        return props.children({ state, actions, context });
     };
 
     return {
         Consumer,
         Provider,
         useController,
-        useNewController,
-        makeController,
+        useNewController: useNewController as NewControllerFunction<T, A, C>,
+        makeController: makeController as NewControllerFunction<T, A, C>,
     };
 }
 
@@ -198,16 +190,20 @@ function selectorResultChanged<S>(
 /**
  * Utility type for extracting the Typescript type of a controller/actions/state.
  */
-export type ControllerType<C> = C extends React.FC<ProviderProps<infer T, infer A>> // Provider
-    ? Controller<T, A>
-    : C extends (defaultState?: Immutable<infer T>) => Controller<infer T, infer A> // useNewController and makeController.
-    ? Controller<T, A>
-    : C extends UseControllerFn<infer T, infer A> // useController
-    ? Controller<T, A>
-    : C extends React.FC<{
-          children: (value: { state: Immutable<infer T>; actions: infer A }) => JSX.Element;
+export type ControllerType<Q> = Q extends React.FC<ProviderProps<infer T, infer A, infer C>> // Provider
+    ? Controller<T, A, C>
+    : Q extends (params: any) => Controller<infer T, infer A, infer C> // useNewController and makeController.
+    ? Controller<T, A, C>
+    : Q extends UseControllerFn<infer T, infer A, infer C> // useController
+    ? Controller<T, A, C>
+    : Q extends React.FC<{
+          children: (value: {
+              state: Immutable<infer T>;
+              actions: infer A;
+              context: infer C;
+          }) => JSX.Element;
       }> // Consumer
-    ? Controller<T, A>
-    : C extends ImmerEnteResult<infer T, infer A> // Whole ImmerEnteResult
-    ? Controller<T, A>
+    ? Controller<T, A, C>
+    : Q extends ImmerEnteResult<infer T, infer A, infer C> // Whole ImmerEnteResult
+    ? Controller<T, A, C>
     : never;

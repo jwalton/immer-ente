@@ -23,7 +23,37 @@ The biggest advantages over immer-wieder:
 
 ## How to use it
 
-The basic idea is, you create a state object, and a set of actions. The `immerEnte()` function returns a `{ Provider, Consumer, useController, useNewController }` object you can use in your application:
+You create a state object, and a set of actions. The `immerEnte()` function returns a `{ Provider, Consumer, useController, useNewController, makeController }` object you can use in your application. Here's a simple example that creates a controller:
+
+```tsx
+import immerEnte, { ControllerType } from 'immer-ente';
+
+// This is the state...
+const initialState = {
+  age: 10,
+};
+
+const { makeController } = immerEnte(initialState, (updateState) => ({
+  // And these are your actions...
+  incrementAge() {
+    updateState((state) => {
+      state.age++;
+    });
+  },
+}));
+
+const { actions, getState } = makeController();
+
+console.log(getState().age); // 9
+
+actions.incrementAge();
+
+console.log(getState().age); // 10
+
+getState().age = 101; // This will throw an error, because state is immutable outside `updateState`.
+```
+
+Here's a slightly more complicated example, which creates a React Context:
 
 ```tsx
 import immerEnte, { ControllerType } from 'immer-ente';
@@ -40,16 +70,17 @@ const {
   // throw an error if no Provider exists.
   useController: useMyController,
   // `useNewController` will create a new controller and use it, instead of
-  // finding one from the controller.
+  // finding one from the Provider.
   useNewController: useNewMyController,
 } = immerEnte(
-  // Our initial state.
+  // Default initial state - this can be overridden in the Provider
+  // or in useNewController.
   initialState,
 
   // A function which returns an "actions" object.  Actions have access to the
   // current state via `getState()` and can update state with
   // `updateState(draft => ...)`.  See below for more details.
-  (updateState, getState) => ({
+  (updateState, getState, getContext) => ({
     // A simple action.
     incrementAge() {
       updateState((state) => {
@@ -216,6 +247,47 @@ function MyComponent() {
 
 This will not re-render in the case where `isEqual` returns
 true (in this case when the two objects are shallow-equal).
+
+## Dependency Injection
+
+Sometimes you have some dependency you want to pass into your controller, like
+a cache or an API that's different server side than client side. You can do this
+with a `context`.
+
+```ts
+interface Api {
+  getNewAge(): number;
+}
+
+const api = {
+  getNewAge() {
+    return 12;
+  },
+};
+
+const { Provider, useController } = immerEnte(
+  { age: 7 },
+  (updateState, _getState, getContext: () => Api) => ({
+    incrementAge: () =>
+      updateState((state) => {
+        state.age = getContext().getNewAge();
+      }),
+  })
+);
+
+export function Screen() {
+  // Can pass `context` in to the Provider.
+  return (
+    <Provider context={api}>
+      <MyComponent />
+    </Provider>
+  );
+}
+```
+
+When using a context, the context must be provided when using `<Provider>`, unless
+you pass in a `controller` prop. It also must be passed when calling
+`useNewController({ context })` or `makeController({ context })`.
 
 ## Writing unit tests
 

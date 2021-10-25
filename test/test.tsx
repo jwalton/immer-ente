@@ -247,12 +247,14 @@ describe('immerEnte', function () {
         }
 
         try {
+            sinon.stub(console, 'error');
             render(
                 <ErrorBoundary>
                     <WillError />
                 </ErrorBoundary>
             );
         } finally {
+            sinon.restore();
             screen.getByText('Error: Missing immer-ente provider.');
         }
     });
